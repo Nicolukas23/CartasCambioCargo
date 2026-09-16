@@ -488,12 +488,21 @@ function normalizeHeader(s) {
   return s.normalize("NFKD").replace(/[̀-ͯ]/g, "").trim().toUpperCase().replace(/\s+/g, " ");
 }
 
+// Formato colombiano de cédula: puntos cada 3 dígitos (1.007.705.290, 39.558.394).
+// Quita cualquier separador existente primero para que sea seguro reaplicarlo.
+function formatCedula(raw) {
+  const digits = String(raw || "").replace(/\D/g, "");
+  if (!digits) return String(raw || "").trim();
+  return digits.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+}
+
 function rowsToObjects(dataRows, order) {
   return dataRows.map(cells => {
     const obj = {};
     order.forEach((key, i) => {
       if (key) obj[key] = (cells[i] || "").trim();
     });
+    if (obj.cedula) obj.cedula = formatCedula(obj.cedula);
     if (!("garantizado" in obj)) obj.garantizado = false;
     return obj;
   }).filter(r => r.cedula || r.nombre);
@@ -906,11 +915,12 @@ document.getElementById("btnGenerate").addEventListener("click", () => {
       const templateBytes = base64ToUint8Array(window.TEMPLATE_BASE64);
 
       parsedRows.forEach((row) => {
+        const cedulaFmt = formatCedula(row.cedula);
         const pizZip = new window.PizZip(templateBytes);
         const doc = new window.Docxtemplater(pizZip, { paragraphLoop: true, linebreaks: true });
         doc.render({
           nombre: row.nombre || "",
-          cedula: row.cedula || "",
+          cedula: cedulaFmt,
           cargo_actual: row.cargo_actual || "",
           cargo_nuevo: row.cargo_nuevo || "",
           gerencia_nueva: row.gerencia_nueva || "",
@@ -921,7 +931,7 @@ document.getElementById("btnGenerate").addEventListener("click", () => {
           garantizado: !!row.garantizado,
         });
         const outBuf = doc.getZip().generate({ type: "uint8array" });
-        const fname = `${sanitizeFilename(row.nombre)}-${sanitizeFilename(row.cedula)}.docx`;
+        const fname = `${sanitizeFilename(row.nombre)}-${cedulaFmt}.docx`;
         zip.file(fname, outBuf);
       });
 
