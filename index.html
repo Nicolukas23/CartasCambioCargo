@@ -921,7 +921,7 @@ document.getElementById("btnGenerate").addEventListener("click", () => {
           garantizado: !!row.garantizado,
         });
         const outBuf = doc.getZip().generate({ type: "uint8array" });
-        const fname = `Otrosi_Cambio_Cargo_${sanitizeFilename(row.nombre)}_${sanitizeFilename(row.cedula)}.docx`;
+        const fname = `${sanitizeFilename(row.nombre)}-${sanitizeFilename(row.cedula)}.docx`;
         zip.file(fname, outBuf);
       });
 
