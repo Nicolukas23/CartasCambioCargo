@@ -382,7 +382,7 @@
 
   <div class="panel">
     <h2>2. Pega la tabla del correo (texto o captura de pantalla)</h2>
-    <p class="panel-desc">Selecciona y copia la tabla del cuerpo del correo y pégala aquí, o pega/arrastra directamente una captura de pantalla — se lee con OCR y se convierte en tabla automáticamente. Columnas esperadas: CEDULA, NOMBRES Y APELLIDOS, GERENCIA NUEVA, CARGO ACTUAL, CONFIRMAR CARGO NUEVO, CARGO ANTERIOR, NOVEDAD.</p>
+    <p class="panel-desc">Selecciona y copia la tabla del cuerpo del correo y pégala aquí (funciona pegado como tabla con tabulaciones o como una celda por línea), pega/arrastra una captura de pantalla, o adjunta el Excel. Columnas esperadas: CEDULA, NOMBRES Y APELLIDOS, GERENCIA NUEVA, CARGO ACTUAL, CONFIRMAR CARGO NUEVO, CARGO ANTERIOR, NOVEDAD.</p>
     <div class="paste-zone" id="pasteZone">
       <textarea id="pasteArea" placeholder="Pega aquí la tabla copiada del correo, o pega/arrastra una captura de pantalla... (Cmd/Ctrl+V)"></textarea>
       <div class="ocr-overlay" id="ocrOverlay">
@@ -404,6 +404,11 @@
         Subir captura
       </button>
       <input type="file" id="fileImageInput" accept="image/*" style="display:none;">
+      <button class="ghost" id="btnUploadExcel">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M9.5 12.5l5 5M14.5 12.5l-5 5"/></svg>
+        Adjuntar Excel
+      </button>
+      <input type="file" id="fileExcelInput" accept=".xlsx,.xls,.csv" style="display:none;">
       <span id="parseStatus"></span>
     </div>
   </div>
@@ -483,9 +488,20 @@ function normalizeHeader(s) {
   return s.normalize("NFKD").replace(/[̀-ͯ]/g, "").trim().toUpperCase().replace(/\s+/g, " ");
 }
 
-function parseTable(raw) {
-  const lines = raw.replace(/\r\n/g, "\n").split("\n").map(l => l.trim()).filter(l => l.length > 0);
-  if (lines.length === 0) return [];
+function rowsToObjects(dataRows, order) {
+  return dataRows.map(cells => {
+    const obj = {};
+    order.forEach((key, i) => {
+      if (key) obj[key] = (cells[i] || "").trim();
+    });
+    if (!("garantizado" in obj)) obj.garantizado = false;
+    return obj;
+  }).filter(r => r.cedula || r.nombre);
+}
+
+// Formato tabla clásico: cada línea es una fila, columnas separadas por tabulación
+// (pegado desde Excel, o cuando el correo sí conserva tabs).
+function parseTabSeparated(lines) {
   const rows = lines.map(l => l.split("\t"));
   let dataRows = rows;
   let order = DEFAULT_ORDER;
@@ -496,15 +512,39 @@ function parseTable(raw) {
     order = firstRowKeys.map(k => COLUMN_ALIASES[k] || null);
     dataRows = rows.slice(1);
   }
+  return rowsToObjects(dataRows, order);
+}
 
-  return dataRows.map(cells => {
-    const obj = {};
-    order.forEach((key, i) => {
-      if (key) obj[key] = (cells[i] || "").trim();
-    });
-    if (!("garantizado" in obj)) obj.garantizado = false;
-    return obj;
-  }).filter(r => r.cedula || r.nombre);
+// Formato "una celda por línea": así queda al copiar la tabla del cuerpo de
+// muchos correos de Outlook (cada celda en su propio párrafo, sin tabs).
+// Se detectan los encabezados conocidos al inicio para saber cuántas
+// columnas hay y en qué orden, y se agrupan las líneas restantes en bloques
+// de ese tamaño.
+function parseOneCellPerLine(lines) {
+  const order = [];
+  let i = 0;
+  for (; i < lines.length; i++) {
+    const key = COLUMN_ALIASES[normalizeHeader(lines[i])];
+    if (!key) break;
+    order.push(key);
+  }
+  if (order.length === 0) return [];
+
+  const dataLines = lines.slice(i);
+  const rows = [];
+  for (let start = 0; start < dataLines.length; start += order.length) {
+    const chunk = dataLines.slice(start, start + order.length);
+    if (chunk.length < order.length) break;
+    rows.push(chunk);
+  }
+  return rowsToObjects(rows, order);
+}
+
+function parseTable(raw) {
+  const lines = raw.replace(/\r\n/g, "\n").split("\n").map(l => l.trim()).filter(l => l.length > 0);
+  if (lines.length === 0) return [];
+  const hasTabs = lines.some(l => l.includes("\t"));
+  return hasTabs ? parseTabSeparated(lines) : parseOneCellPerLine(lines);
 }
 
 let parsedRows = [];
@@ -700,6 +740,37 @@ document.getElementById("btnUploadImage").addEventListener("click", () => {
 });
 document.getElementById("fileImageInput").addEventListener("change", (e) => {
   Array.from(e.target.files || []).forEach(processImageFile);
+  e.target.value = "";
+});
+
+// ---------- adjuntar Excel/CSV ----------
+async function processExcelFile(file) {
+  const status = document.getElementById("parseStatus");
+  try {
+    const buf = await file.arrayBuffer();
+    const wb = window.XLSX.read(buf, { type: "array" });
+    const sheetName = wb.SheetNames[0];
+    const sheet = wb.Sheets[sheetName];
+    const rows = window.XLSX.utils.sheet_to_json(sheet, { header: 1, blankrows: false, defval: "" });
+    const tsv = rows
+      .map(r => r.map(c => String(c).trim()).join("\t"))
+      .filter(l => l.replace(/\t/g, "").trim().length > 0)
+      .join("\n");
+    const ta = document.getElementById("pasteArea");
+    ta.value = ta.value.trim() ? ta.value.trim() + "\n" + tsv : tsv;
+    ta.classList.remove("flash"); void ta.offsetWidth; ta.classList.add("flash");
+    setStatus(status, "info", `Excel leído (hoja "${sheetName}"). Revisa y da clic en Procesar tabla.`);
+  } catch (e) {
+    console.error(e);
+    setStatus(status, "err", "No se pudo leer el Excel: " + e.message);
+  }
+}
+
+document.getElementById("btnUploadExcel").addEventListener("click", () => {
+  document.getElementById("fileExcelInput").click();
+});
+document.getElementById("fileExcelInput").addEventListener("change", (e) => {
+  Array.from(e.target.files || []).forEach(processExcelFile);
   e.target.value = "";
 });
 
