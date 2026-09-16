@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Generador de Otrosí - Cambio de Cargo</title>
+<title>Cambio de Cartas</title>
 <style>
   :root {
     color-scheme: light dark;
@@ -82,19 +82,32 @@
   }
   .wrap { max-width: 980px; margin: 0 auto; }
 
-  .topbar { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 6px; }
-  h1 { font-size: 21px; margin: 0 0 4px; letter-spacing: -.01em; }
-  .sub { color: var(--muted); font-size: 13px; max-width: 640px; line-height: 1.5; }
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    margin-bottom: 6px; padding-bottom: 20px; border-bottom: 1px solid var(--border);
+  }
+  .topbar-left { display: flex; align-items: center; gap: 14px; }
+  .logo-mark {
+    width: 46px; height: 46px; border-radius: 12px; flex-shrink: 0;
+    background: linear-gradient(155deg, var(--accent), var(--accent-dark));
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 14px -4px rgba(179,56,44,.45);
+  }
+  .logo-mark svg { width: 24px; height: 24px; color: #fff; }
+  h1 { font-size: 20px; margin: 0; letter-spacing: -.01em; line-height: 1.25; }
+  .eyebrow { font-size: 10.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin: 0 0 2px; }
+  .sub { color: var(--muted); font-size: 13px; max-width: 620px; line-height: 1.5; margin-top: 4px; }
+  .badges-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
   .badge-local {
     display: inline-flex; align-items: center; gap: 5px;
     font-size: 11px; color: var(--ok); background: var(--ok-soft);
-    border-radius: 999px; padding: 3px 9px; margin-top: 8px; font-weight: 600;
+    border-radius: 999px; padding: 3px 9px; font-weight: 600;
   }
   .badge-local svg { width: 11px; height: 11px; }
 
   #themeToggle {
     background: var(--panel); border: 1px solid var(--border); color: var(--muted);
-    width: 36px; height: 36px; border-radius: 10px; padding: 0;
+    width: 38px; height: 38px; border-radius: 10px; padding: 0;
     display: flex; align-items: center; justify-content: center; flex-shrink: 0;
     box-shadow: var(--shadow);
   }
@@ -174,6 +187,15 @@
     0% { background: var(--ok-soft); border-color: var(--ok); }
     100% { background: var(--panel-2); border-color: var(--border-strong); }
   }
+  .paste-zone.drag-over textarea { border-color: var(--accent); background: var(--accent-soft); }
+  .ocr-overlay {
+    display: none; position: absolute; inset: 0; border-radius: 10px;
+    background: rgba(20,22,26,.55); backdrop-filter: blur(1px);
+    color: #fff; align-items: center; justify-content: center; gap: 10px;
+    font-size: 13px; font-weight: 600;
+  }
+  .ocr-overlay.show { display: flex; }
+  .spinner-dark { border-color: rgba(255,255,255,.35); border-top-color: #fff; }
 
   button {
     background: var(--accent);
@@ -311,12 +333,20 @@
 <div class="wrap">
 
   <div class="topbar">
-    <div>
-      <h1>Generador de Otrosí — Cambio de Cargo</h1>
-      <div class="sub">Pega la tabla del correo, confirma mes/ciudad, marca quién lleva la Cláusula Quinta (Garantizado) y genera todas las cartas en un solo ZIP.</div>
-      <div class="badge-local">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z"/></svg>
-        100% local — nada se envía a ningún servidor
+    <div class="topbar-left">
+      <div class="logo-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12h6M9 16h6M9 8h1"/><path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8l-5-5z"/><path d="M14 3v5h5"/></svg>
+      </div>
+      <div>
+        <p class="eyebrow">Gestión Humana · Otrosí</p>
+        <h1>Cambio de Cartas</h1>
+        <div class="sub">Pega la tabla del correo (o una captura de pantalla), confirma mes/ciudad, marca quién lleva la Cláusula Quinta (Garantizado) y genera todas las cartas en un solo ZIP.</div>
+        <div class="badges-row">
+          <div class="badge-local">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z"/></svg>
+            100% local — nada se envía a ningún servidor
+          </div>
+        </div>
       </div>
     </div>
     <button id="themeToggle" title="Cambiar tema" aria-label="Cambiar tema">
@@ -351,10 +381,14 @@
   </div>
 
   <div class="panel">
-    <h2>2. Pega la tabla del correo</h2>
-    <p class="panel-desc">Selecciona y copia la tabla completa del cuerpo del correo (incluye encabezados) y pégala aquí. Columnas esperadas: CEDULA, NOMBRES Y APELLIDOS, GERENCIA NUEVA, CARGO ACTUAL, CONFIRMAR CARGO NUEVO, CARGO ANTERIOR, NOVEDAD.</p>
-    <div class="paste-zone">
-      <textarea id="pasteArea" placeholder="Pega aquí la tabla copiada del correo... (Cmd/Ctrl+V)"></textarea>
+    <h2>2. Pega la tabla del correo (texto o captura de pantalla)</h2>
+    <p class="panel-desc">Selecciona y copia la tabla del cuerpo del correo y pégala aquí, o pega/arrastra directamente una captura de pantalla — se lee con OCR y se convierte en tabla automáticamente. Columnas esperadas: CEDULA, NOMBRES Y APELLIDOS, GERENCIA NUEVA, CARGO ACTUAL, CONFIRMAR CARGO NUEVO, CARGO ANTERIOR, NOVEDAD.</p>
+    <div class="paste-zone" id="pasteZone">
+      <textarea id="pasteArea" placeholder="Pega aquí la tabla copiada del correo, o pega/arrastra una captura de pantalla... (Cmd/Ctrl+V)"></textarea>
+      <div class="ocr-overlay" id="ocrOverlay">
+        <span class="spinner spinner-dark"></span>
+        <span id="ocrOverlayText">Leyendo imagen con OCR...</span>
+      </div>
     </div>
     <div class="actions">
       <button id="btnParse">
@@ -365,6 +399,11 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M8 4H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-2"/></svg>
         Pegar del portapapeles
       </button>
+      <button class="ghost" id="btnUploadImage">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+        Subir captura
+      </button>
+      <input type="file" id="fileImageInput" accept="image/*" style="display:none;">
       <span id="parseStatus"></span>
     </div>
   </div>
@@ -425,6 +464,7 @@
 
 <script src="vendor.bundle.js"></script>
 <script src="template_base64.js"></script>
+<script src="ocr/tesseract.min.js"></script>
 <script>
 const MESES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
 
@@ -540,6 +580,127 @@ document.getElementById("btnPasteClipboard").addEventListener("click", async () 
   } catch (e) {
     setStatus(document.getElementById("parseStatus"), "err", "No se pudo leer el portapapeles, pega manualmente (Cmd/Ctrl+V).");
   }
+});
+
+// ---------- OCR (pegar/arrastrar/subir captura de pantalla) ----------
+let ocrWorkerPromise = null;
+function getOcrWorker() {
+  if (!ocrWorkerPromise) {
+    ocrWorkerPromise = Tesseract.createWorker("spa", 1, {
+      workerPath: "ocr/worker.min.js",
+      corePath: "ocr/core",
+      langPath: "ocr/lang",
+      gzip: true,
+    });
+  }
+  return ocrWorkerPromise;
+}
+
+// Reconstruye filas/columnas a partir de las posiciones (bbox) de cada palabra reconocida.
+function wordsToTableText(words) {
+  if (!words || words.length === 0) return "";
+  const items = words
+    .map(w => ({ text: w.text, x0: w.bbox.x0, x1: w.bbox.x1, yc: (w.bbox.y0 + w.bbox.y1) / 2 }))
+    .sort((a, b) => a.yc - b.yc);
+
+  const rowTolerance = 14;
+  const rows = [];
+  for (const w of items) {
+    let row = rows.find(r => Math.abs(r.yc - w.yc) < rowTolerance);
+    if (!row) { row = { yc: w.yc, words: [] }; rows.push(row); }
+    row.words.push(w);
+    row.yc = row.words.reduce((s, x) => s + x.yc, 0) / row.words.length;
+  }
+  rows.sort((a, b) => a.yc - b.yc);
+
+  const colGapThreshold = 32;
+  const lines = rows.map(row => {
+    row.words.sort((a, b) => a.x0 - b.x0);
+    const cells = [];
+    let current = [row.words[0]];
+    for (let i = 1; i < row.words.length; i++) {
+      const gap = row.words[i].x0 - row.words[i - 1].x1;
+      if (gap > colGapThreshold) { cells.push(current); current = [row.words[i]]; }
+      else current.push(row.words[i]);
+    }
+    cells.push(current);
+    return cells.map(c => c.map(w => w.text).join(" ")).join("\t");
+  });
+  return lines.join("\n");
+}
+
+async function processImageFile(file) {
+  const overlay = document.getElementById("ocrOverlay");
+  const parseStatus = document.getElementById("parseStatus");
+  if (location.protocol === "file:") {
+    setStatus(parseStatus, "err", "El OCR necesita abrir la página por http/https (usa el link de GitHub Pages), no funciona con doble clic local.");
+    return;
+  }
+  overlay.classList.add("show");
+  document.getElementById("ocrOverlayText").textContent = "Leyendo imagen con OCR...";
+  try {
+    const worker = await getOcrWorker();
+    const { data } = await worker.recognize(file);
+    const tsv = wordsToTableText(data.words);
+    const ta = document.getElementById("pasteArea");
+    ta.value = ta.value.trim() ? ta.value.trim() + "\n" + tsv : tsv;
+    ta.classList.remove("flash"); void ta.offsetWidth; ta.classList.add("flash");
+    setStatus(parseStatus, "info", "Texto extraído de la imagen. Revísalo y corrige lo necesario antes de Procesar tabla.");
+  } catch (e) {
+    console.error(e);
+    setStatus(parseStatus, "err", "No se pudo leer la imagen con OCR: " + e.message);
+  } finally {
+    overlay.classList.remove("show");
+  }
+}
+
+function extractImageFiles(dataTransferOrClipboard) {
+  const files = [];
+  const items = dataTransferOrClipboard && dataTransferOrClipboard.items;
+  if (items) {
+    for (const item of items) {
+      if (item.kind === "file" && item.type.startsWith("image/")) {
+        const f = item.getAsFile();
+        if (f) files.push(f);
+      }
+    }
+  }
+  if (files.length === 0 && dataTransferOrClipboard && dataTransferOrClipboard.files) {
+    for (const f of dataTransferOrClipboard.files) {
+      if (f.type.startsWith("image/")) files.push(f);
+    }
+  }
+  return files;
+}
+
+const pasteZone = document.getElementById("pasteZone");
+const pasteArea = document.getElementById("pasteArea");
+
+pasteArea.addEventListener("paste", (e) => {
+  const images = extractImageFiles(e.clipboardData);
+  if (images.length > 0) {
+    e.preventDefault();
+    images.forEach(processImageFile);
+  }
+});
+
+["dragenter", "dragover"].forEach(evt => {
+  pasteZone.addEventListener(evt, (e) => { e.preventDefault(); pasteZone.classList.add("drag-over"); });
+});
+["dragleave", "drop"].forEach(evt => {
+  pasteZone.addEventListener(evt, (e) => { e.preventDefault(); pasteZone.classList.remove("drag-over"); });
+});
+pasteZone.addEventListener("drop", (e) => {
+  const images = extractImageFiles(e.dataTransfer);
+  images.forEach(processImageFile);
+});
+
+document.getElementById("btnUploadImage").addEventListener("click", () => {
+  document.getElementById("fileImageInput").click();
+});
+document.getElementById("fileImageInput").addEventListener("change", (e) => {
+  Array.from(e.target.files || []).forEach(processImageFile);
+  e.target.value = "";
 });
 
 // ---------- render preview ----------
