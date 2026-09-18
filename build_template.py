@@ -3,6 +3,12 @@ reusable docxtpl template by replacing each yellow-highlighted run-group with a
 {tag}, and wrapping CLAUSULA QUINTA (Garantizado) in a {#garantizado}...{/garantizado}
 conditional block. Preserves all non-highlighted formatting (bold headers, tabs, etc.)
 because only the highlighted runs are touched.
+
+Also replaces the hardcoded "los primeros dos meses" span inside CLAUSULA QUINTA
+with {frase_garantizado} — the number of guaranteed months varies per person
+(1, 2, 3...), so index.html computes the right phrase per row ("el primer mes" /
+"los primeros <n> meses") and passes it in at render time. See fraseGarantizado()
+in index.html.
 """
 import docx
 from docx.enum.text import WD_COLOR_INDEX
@@ -64,11 +70,22 @@ def wrap_garantizado(doc):
     raise ValueError("CLAUSULA QUINTA paragraph not found")
 
 
+def replace_meses_garantizado(doc):
+    for p in doc.paragraphs:
+        if p.text.strip().startswith(CLAUSULA_QUINTA_START) or "GARANTIZADO" in p.text:
+            for r in p.runs:
+                if r.text == "los primeros dos meses":
+                    r.text = "{frase_garantizado}"
+                    return
+    raise ValueError('"los primeros dos meses" span not found in CLAUSULA QUINTA')
+
+
 def main():
     doc = docx.Document(SRC)
     for p in doc.paragraphs:
         replace_highlighted_groups(p)
     wrap_garantizado(doc)
+    replace_meses_garantizado(doc)
     doc.save(OUT)
     print("Saved", OUT)
 

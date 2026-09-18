@@ -254,6 +254,19 @@
   }
   td input[type=text]:hover { background: var(--panel-2); }
   td input[type=text]:focus { outline: none; border-color: var(--accent); background: var(--panel-2); box-shadow: 0 0 0 2px var(--accent-soft); }
+  td input[type=number] {
+    width: 56px;
+    text-align: center;
+    border: 1px solid var(--border);
+    background: var(--panel-2);
+    font-size: 12.5px;
+    color: var(--text);
+    padding: 4px 6px;
+    border-radius: 5px;
+  }
+  td input[type=number]:hover:not(:disabled) { border-color: var(--border-strong); }
+  td input[type=number]:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+  td input[type=number]:disabled { opacity: .35; background: transparent; border-color: transparent; }
   .center { text-align: center; }
   .table-scroll { overflow-x: auto; border-radius: 10px; border: 1px solid var(--border); }
   .table-scroll table { margin-top: 0; }
@@ -415,7 +428,7 @@
 
   <div class="panel" id="previewPanel" style="display:none;">
     <h2>3. Revisa los datos y marca "Garantizado" <span class="count-badge" id="rowCount">0</span></h2>
-    <p class="panel-desc">Puedes corregir cualquier celda a mano antes de generar. El interruptor de Garantizado activa la Cláusula Quinta en la carta de esa persona.</p>
+    <p class="panel-desc">Puedes corregir cualquier celda a mano antes de generar. El interruptor de Garantizado activa la Cláusula Quinta en la carta de esa persona; el campo Meses (solo habilitado con Garantizado activo) define cuántos meses de parte variable garantizada se le dan a esa persona (1, 2, 3, la cantidad que aplique).</p>
 
     <div class="summary-bar">
       <span><b id="sumTotal">0</b> persona(s)</span>
@@ -437,6 +450,7 @@
             <th>Cargo Anterior</th>
             <th>Novedad</th>
             <th class="center">Garantizado</th>
+            <th class="center">Meses</th>
           </tr>
         </thead>
         <tbody></tbody>
@@ -504,6 +518,7 @@ function rowsToObjects(dataRows, order) {
     });
     if (obj.cedula) obj.cedula = formatCedula(obj.cedula);
     if (!("garantizado" in obj)) obj.garantizado = false;
+    if (!("meses_garantizado" in obj)) obj.meses_garantizado = 2;
     return obj;
   }).filter(r => r.cedula || r.nombre);
 }
@@ -806,13 +821,32 @@ function renderPreview() {
     const chk = document.createElement("input");
     chk.type = "checkbox";
     chk.checked = !!row.garantizado;
-    chk.addEventListener("change", e => { row.garantizado = e.target.checked; updateSummary(); });
     const slider = document.createElement("span");
     slider.className = "slider";
     label.appendChild(chk);
     label.appendChild(slider);
     tdChk.appendChild(label);
     tr.appendChild(tdChk);
+
+    const tdMeses = document.createElement("td");
+    tdMeses.className = "center";
+    const mesesInput = document.createElement("input");
+    mesesInput.type = "number";
+    mesesInput.min = "1";
+    mesesInput.max = "24";
+    mesesInput.step = "1";
+    mesesInput.value = row.meses_garantizado || 2;
+    mesesInput.disabled = !row.garantizado;
+    mesesInput.addEventListener("input", e => { row.meses_garantizado = e.target.value; });
+    tdMeses.appendChild(mesesInput);
+    tr.appendChild(tdMeses);
+
+    chk.addEventListener("change", e => {
+      row.garantizado = e.target.checked;
+      mesesInput.disabled = !row.garantizado;
+      updateSummary();
+    });
+
     tbody.appendChild(tr);
   });
   document.getElementById("rowCount").textContent = parsedRows.length;
@@ -878,6 +912,20 @@ function base64ToUint8Array(base64) {
   return bytes;
 }
 
+// Cláusula Quinta (Garantizado): número de meses -> frase en español ("el
+// primer mes" para 1, "los primeros <palabra> meses" para 2+). Cae a dígito
+// si el número no tiene palabra mapeada.
+const NUM_PALABRA = {
+  2: "dos", 3: "tres", 4: "cuatro", 5: "cinco", 6: "seis", 7: "siete",
+  8: "ocho", 9: "nueve", 10: "diez", 11: "once", 12: "doce",
+};
+function fraseGarantizado(meses) {
+  const n = parseInt(meses, 10);
+  if (!n || n <= 0) return "";
+  if (n === 1) return "el primer mes";
+  return `los primeros ${NUM_PALABRA[n] || n} meses`;
+}
+
 function sanitizeFilename(s) {
   return (s || "SIN_NOMBRE").normalize("NFKD").replace(/[̀-ͯ]/g, "")
     .replace(/[^A-Za-z0-9 _-]/g, "").trim().replace(/\s+/g, "_");
@@ -896,6 +944,12 @@ document.getElementById("btnGenerate").addEventListener("click", () => {
   }
   if (parsedRows.length === 0) {
     setStatus(status, "err", "Primero procesa la tabla del correo.");
+    return;
+  }
+  const invalidMeses = parsedRows.filter(r => r.garantizado &&
+    !(Number.isInteger(Number(r.meses_garantizado)) && Number(r.meses_garantizado) > 0));
+  if (invalidMeses.length > 0) {
+    setStatus(status, "err", `${invalidMeses.length} persona(s) con Garantizado activo no tienen un número de meses válido (revisa la columna Meses).`);
     return;
   }
 
@@ -929,6 +983,7 @@ document.getElementById("btnGenerate").addEventListener("click", () => {
           Mes: Mes,
           anio: String(anio),
           garantizado: !!row.garantizado,
+          frase_garantizado: row.garantizado ? fraseGarantizado(row.meses_garantizado) : "",
         });
         const outBuf = doc.getZip().generate({ type: "uint8array" });
         const fname = `${sanitizeFilename(row.nombre)}-${cedulaFmt}.docx`;
